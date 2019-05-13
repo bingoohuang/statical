@@ -36,25 +36,25 @@ var ZipData string
 type File struct {
 	os.FileInfo
 	Data []byte
-	Fs   *StatikFS
+	Fs   *StaticalFS
 }
 
-type StatikFS struct {
+type StaticalFS struct {
 	Files map[string]File
 	Dirs  map[string][]string
 }
 
 // Register registers zip contents data, later used to initialize
-// the statik file system.
+// the statical file system.
 func Register(data string) {
 	ZipData = data
 }
 
 // New creates a new file system with the registered zip contents data.
 // It unzips all files and stores them in an in-memory map.
-func New() (*StatikFS, error) {
+func New() (*StaticalFS, error) {
 	if ZipData == "" {
-		return nil, errors.New("statik/fs: no zip data registered")
+		return nil, errors.New("statical/fs: no zip data registered")
 	}
 	zipReader, err := zip.NewReader(strings.NewReader(ZipData), int64(len(ZipData)))
 	if err != nil {
@@ -62,13 +62,13 @@ func New() (*StatikFS, error) {
 	}
 	files := make(map[string]File, len(zipReader.File))
 	dirs := make(map[string][]string)
-	fs := &StatikFS{Files: files, Dirs: dirs}
+	fs := &StaticalFS{Files: files, Dirs: dirs}
 	for _, zipFile := range zipReader.File {
 		fi := zipFile.FileInfo()
 		f := File{FileInfo: fi, Fs: fs}
 		f.Data, err = unzip(zipFile)
 		if err != nil {
-			return nil, fmt.Errorf("statik/fs: error unzipping file %q: %s", zipFile.Name, err)
+			return nil, fmt.Errorf("statical/fs: error unzipping file %q: %s", zipFile.Name, err)
 		}
 		files["/"+zipFile.Name] = f
 	}
@@ -121,7 +121,7 @@ func unzip(zf *zip.File) ([]byte, error) {
 // no file matching the given file name is found in the archive.
 // If a directory is requested, Open returns the file named "index.html"
 // in the requested directory, if that file exists.
-func (fs *StatikFS) Open(name string) (http.File, error) {
+func (fs *StaticalFS) Open(name string) (http.File, error) {
 	name = strings.Replace(name, "//", "/", -1)
 	if f, ok := fs.Files[name]; ok {
 		return newHTTPFile(f), nil

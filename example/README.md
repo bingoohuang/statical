@@ -1,10 +1,10 @@
 # How to run?
 
-Run `go generate` to create a statik package that embeds the binary data underneath the public directory.
+Run `go generate` to create a statical package that embeds the binary data underneath the public directory.
 
 	$ go generate
 
-Once the statik package is generated, run the web server:
+Once the statical package is generated, run the web server:
 
 	$ go run main.go
 
