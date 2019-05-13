@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	nameSourceFile = "statik.go"
+	nameSourceFile = "statical.go"
 )
 
 var namePackage string
@@ -197,7 +197,7 @@ func generateSource(srcPath string) (file *os.File, err error) {
 package %s
 
 import (
-	"github.com/rakyll/statik/fs"
+	"github.com/bingoohuang/statical/fs"
 )
 
 func init() {

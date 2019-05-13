@@ -1,4 +1,4 @@
-//go:generate statik -src=./public
+//go:generate statical -src=./public
 
 package main
 
@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
-	_ "github.com/rakyll/statik/example/statik"
-	"github.com/rakyll/statik/fs"
+	_ "github.com/bingoohuang/statical/example/statik"
+	"github.com/bingoohuang/statical/fs"
 )
 
 // Before buildling, run go generate.
