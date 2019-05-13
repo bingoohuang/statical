@@ -30,43 +30,43 @@ import (
 	"time"
 )
 
-var zipData string
+var ZipData string
 
 // file holds unzipped read-only file contents and file metadata.
-type file struct {
+type File struct {
 	os.FileInfo
-	data []byte
-	fs   *statikFS
+	Data []byte
+	Fs   *StatikFS
 }
 
-type statikFS struct {
-	files map[string]file
-	dirs  map[string][]string
+type StatikFS struct {
+	Files map[string]File
+	Dirs  map[string][]string
 }
 
 // Register registers zip contents data, later used to initialize
 // the statik file system.
 func Register(data string) {
-	zipData = data
+	ZipData = data
 }
 
 // New creates a new file system with the registered zip contents data.
 // It unzips all files and stores them in an in-memory map.
-func New() (*statikFS, error) {
-	if zipData == "" {
+func New() (*StatikFS, error) {
+	if ZipData == "" {
 		return nil, errors.New("statik/fs: no zip data registered")
 	}
-	zipReader, err := zip.NewReader(strings.NewReader(zipData), int64(len(zipData)))
+	zipReader, err := zip.NewReader(strings.NewReader(ZipData), int64(len(ZipData)))
 	if err != nil {
 		return nil, err
 	}
-	files := make(map[string]file, len(zipReader.File))
+	files := make(map[string]File, len(zipReader.File))
 	dirs := make(map[string][]string)
-	fs := &statikFS{files: files, dirs: dirs}
+	fs := &StatikFS{Files: files, Dirs: dirs}
 	for _, zipFile := range zipReader.File {
 		fi := zipFile.FileInfo()
-		f := file{FileInfo: fi, fs: fs}
-		f.data, err = unzip(zipFile)
+		f := File{FileInfo: fi, Fs: fs}
+		f.Data, err = unzip(zipFile)
 		if err != nil {
 			return nil, fmt.Errorf("statik/fs: error unzipping file %q: %s", zipFile.Name, err)
 		}
@@ -76,7 +76,7 @@ func New() (*statikFS, error) {
 		// go up directories recursively in order to care deep directory
 		for dn := path.Dir(fn); dn != fn; {
 			if _, ok := files[dn]; !ok {
-				files[dn] = file{FileInfo: dirInfo{dn}, fs: fs}
+				files[dn] = File{FileInfo: dirInfo{dn}, Fs: fs}
 			} else {
 				break
 			}
@@ -86,10 +86,10 @@ func New() (*statikFS, error) {
 	for fn := range files {
 		dn := path.Dir(fn)
 		if fn != dn {
-			fs.dirs[dn] = append(fs.dirs[dn], path.Base(fn))
+			fs.Dirs[dn] = append(fs.Dirs[dn], path.Base(fn))
 		}
 	}
-	for _, s := range fs.dirs {
+	for _, s := range fs.Dirs {
 		sort.Strings(s)
 	}
 	return fs, nil
@@ -121,25 +121,25 @@ func unzip(zf *zip.File) ([]byte, error) {
 // no file matching the given file name is found in the archive.
 // If a directory is requested, Open returns the file named "index.html"
 // in the requested directory, if that file exists.
-func (fs *statikFS) Open(name string) (http.File, error) {
+func (fs *StatikFS) Open(name string) (http.File, error) {
 	name = strings.Replace(name, "//", "/", -1)
-	if f, ok := fs.files[name]; ok {
+	if f, ok := fs.Files[name]; ok {
 		return newHTTPFile(f), nil
 	}
 	return nil, os.ErrNotExist
 }
 
-func newHTTPFile(file file) *httpFile {
+func newHTTPFile(file File) *httpFile {
 	if file.IsDir() {
-		return &httpFile{file: file, isDir: true}
+		return &httpFile{File: file, isDir: true}
 	}
-	return &httpFile{file: file, reader: bytes.NewReader(file.data)}
+	return &httpFile{File: file, reader: bytes.NewReader(file.Data)}
 }
 
 // httpFile represents an HTTP file and acts as a bridge
 // between file and http.File.
 type httpFile struct {
-	file
+	File
 
 	reader *bytes.Reader
 	isDir  bool
@@ -184,7 +184,7 @@ func (f *httpFile) Readdir(count int) ([]os.FileInfo, error) {
 	// If count is positive, the specified number of files will be returned,
 	// and if negative, all remaining files will be returned.
 	// The reading position of which file is returned is held in dirIndex.
-	fnames := f.file.fs.dirs[di.name]
+	fnames := f.File.Fs.Dirs[di.name]
 	flen := len(fnames)
 
 	// If dirIdx reaches the end and the count is a positive value,
@@ -205,7 +205,7 @@ func (f *httpFile) Readdir(count int) ([]os.FileInfo, error) {
 		end = flen
 	}
 	for i := start; i < end; i++ {
-		fis = append(fis, f.file.fs.files[path.Join(di.name, fnames[i])].FileInfo)
+		fis = append(fis, f.File.Fs.Files[path.Join(di.name, fnames[i])].FileInfo)
 	}
 	f.dirIdx += len(fis)
 	return fis, nil
