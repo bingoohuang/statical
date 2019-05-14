@@ -46,9 +46,7 @@ type StaticalFS struct {
 
 // Register registers zip contents data, later used to initialize
 // the statical file system.
-func Register(data string) {
-	ZipData = data
-}
+func Register(data string) { ZipData = data }
 
 // New creates a new file system with the registered zip contents data.
 // It unzips all files and stores them in an in-memory map.
@@ -60,13 +58,14 @@ func New() (*StaticalFS, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	files := make(map[string]File, len(zipReader.File))
 	dirs := make(map[string][]string)
 	fs := &StaticalFS{Files: files, Dirs: dirs}
 	for _, zipFile := range zipReader.File {
 		fi := zipFile.FileInfo()
 		f := File{FileInfo: fi, Fs: fs}
-		f.Data, err = unzip(zipFile)
+		f.Data, err = Unzip(zipFile)
 		if err != nil {
 			return nil, fmt.Errorf("statical/fs: error unzipping file %q: %s", zipFile.Name, err)
 		}
@@ -76,7 +75,7 @@ func New() (*StaticalFS, error) {
 		// go up directories recursively in order to care deep directory
 		for dn := path.Dir(fn); dn != fn; {
 			if _, ok := files[dn]; !ok {
-				files[dn] = File{FileInfo: dirInfo{dn}, Fs: fs}
+				files[dn] = File{FileInfo: DirInfo{dn}, Fs: fs}
 			} else {
 				break
 			}
@@ -95,20 +94,19 @@ func New() (*StaticalFS, error) {
 	return fs, nil
 }
 
-var _ = os.FileInfo(dirInfo{})
+var _ os.FileInfo = (*DirInfo)(nil)
 
-type dirInfo struct {
-	name string
-}
+type DirInfo struct{ name string }
 
-func (di dirInfo) Name() string       { return path.Base(di.name) }
-func (di dirInfo) Size() int64        { return 0 }
-func (di dirInfo) Mode() os.FileMode  { return 0755 | os.ModeDir }
-func (di dirInfo) ModTime() time.Time { return time.Time{} }
-func (di dirInfo) IsDir() bool        { return true }
-func (di dirInfo) Sys() interface{}   { return nil }
+func (di DirInfo) RawName() string    { return di.name }
+func (di DirInfo) Name() string       { return path.Base(di.name) }
+func (di DirInfo) Size() int64        { return 0 }
+func (di DirInfo) Mode() os.FileMode  { return 0755 | os.ModeDir }
+func (di DirInfo) ModTime() time.Time { return time.Time{} }
+func (di DirInfo) IsDir() bool        { return true }
+func (di DirInfo) Sys() interface{}   { return nil }
 
-func unzip(zf *zip.File) ([]byte, error) {
+func Unzip(zf *zip.File) ([]byte, error) {
 	rc, err := zf.Open()
 	if err != nil {
 		return nil, err
@@ -124,21 +122,22 @@ func unzip(zf *zip.File) ([]byte, error) {
 func (fs *StaticalFS) Open(name string) (http.File, error) {
 	name = strings.Replace(name, "//", "/", -1)
 	if f, ok := fs.Files[name]; ok {
-		return newHTTPFile(f), nil
+		return NewHTTPFile(f), nil
 	}
+
 	return nil, os.ErrNotExist
 }
 
-func newHTTPFile(file File) *httpFile {
+func NewHTTPFile(file File) *HttpFile {
 	if file.IsDir() {
-		return &httpFile{File: file, isDir: true}
+		return &HttpFile{File: file, isDir: true}
 	}
-	return &httpFile{File: file, reader: bytes.NewReader(file.Data)}
+	return &HttpFile{File: file, reader: bytes.NewReader(file.Data)}
 }
 
-// httpFile represents an HTTP file and acts as a bridge
+// HttpFile represents an HTTP file and acts as a bridge
 // between file and http.File.
-type httpFile struct {
+type HttpFile struct {
 	File
 
 	reader *bytes.Reader
@@ -147,7 +146,7 @@ type httpFile struct {
 }
 
 // Read reads bytes into p, returns the number of read bytes.
-func (f *httpFile) Read(p []byte) (n int, err error) {
+func (f *HttpFile) Read(p []byte) (n int, err error) {
 	if f.reader == nil && f.isDir {
 		return 0, io.EOF
 	}
@@ -155,28 +154,21 @@ func (f *httpFile) Read(p []byte) (n int, err error) {
 }
 
 // Seek seeks to the offset.
-func (f *httpFile) Seek(offset int64, whence int) (ret int64, err error) {
+func (f *HttpFile) Seek(offset int64, whence int) (ret int64, err error) {
 	return f.reader.Seek(offset, whence)
 }
 
-// Stat stats the file.
-func (f *httpFile) Stat() (os.FileInfo, error) {
-	return f, nil
-}
+func (f *HttpFile) Stat() (os.FileInfo, error) { return f, nil }  // Stat stats the file.
+func (f *HttpFile) Close() error               { return nil }     // Close closes the file.
+func (f *HttpFile) IsDir() bool                { return f.isDir } // IsDir returns true if the file location represents a directory.
 
-// IsDir returns true if the file location represents a directory.
-func (f *httpFile) IsDir() bool {
-	return f.isDir
-}
-
-// Readdir returns an empty slice of files, directory
-// listing is disabled.
-func (f *httpFile) Readdir(count int) ([]os.FileInfo, error) {
+// Readdir returns an empty slice of files, directory listing is disabled.
+func (f *HttpFile) Readdir(count int) ([]os.FileInfo, error) {
 	var fis []os.FileInfo
 	if !f.isDir {
 		return fis, nil
 	}
-	di, ok := f.FileInfo.(dirInfo)
+	di, ok := f.FileInfo.(DirInfo)
 	if !ok {
 		return nil, fmt.Errorf("failed to read directory: %q", f.Name())
 	}
@@ -195,6 +187,7 @@ func (f *httpFile) Readdir(count int) ([]os.FileInfo, error) {
 	if start >= flen && count > 0 {
 		return fis, io.EOF
 	}
+
 	var end int
 	if count < 0 {
 		end = flen
@@ -204,13 +197,10 @@ func (f *httpFile) Readdir(count int) ([]os.FileInfo, error) {
 	if end > flen {
 		end = flen
 	}
+
 	for i := start; i < end; i++ {
 		fis = append(fis, f.File.Fs.Files[path.Join(di.name, fnames[i])].FileInfo)
 	}
 	f.dirIdx += len(fis)
 	return fis, nil
-}
-
-func (f *httpFile) Close() error {
-	return nil
 }
