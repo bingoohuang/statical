@@ -45,14 +45,14 @@ type StaticalFS struct {
 }
 
 // Register registers zip contents data, later used to initialize
-// the statical file system.
+// the statiq file system.
 func Register(data string) { ZipData = data }
 
 // New creates a new file system with the registered zip contents data.
 // It unzips all files and stores them in an in-memory map.
 func New() (*StaticalFS, error) {
 	if ZipData == "" {
-		return nil, errors.New("statical/fs: no zip data registered")
+		return nil, errors.New("statiq/fs: no zip data registered")
 	}
 	zipReader, err := zip.NewReader(strings.NewReader(ZipData), int64(len(ZipData)))
 	if err != nil {
@@ -67,7 +67,7 @@ func New() (*StaticalFS, error) {
 		f := File{FileInfo: fi, Fs: fs}
 		f.Data, err = Unzip(zipFile)
 		if err != nil {
-			return nil, fmt.Errorf("statical/fs: error unzipping file %q: %s", zipFile.Name, err)
+			return nil, fmt.Errorf("statiq/fs: error unzipping file %q: %s", zipFile.Name, err)
 		}
 		files["/"+zipFile.Name] = f
 	}

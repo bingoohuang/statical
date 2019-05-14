@@ -1,11 +1,11 @@
 language: go
 
 go:
-  - 1.11.x
+  - 1.12.x
 
 install:
   - go build -v
-  - ./statical -f -src=./example/public -dest=./example/
+  - ./statiq -f -src=./example/public -dest=./example/
 
 script:
   - go test -v -bench=. ./...

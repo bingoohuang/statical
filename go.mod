@@ -1,3 +1,2 @@
-module github.com/bingoohuang/statical
+module github.com/bingoohuang/statiq
 
-go 1.12
