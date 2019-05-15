@@ -36,10 +36,10 @@ var ZipData string
 type File struct {
 	os.FileInfo
 	Data []byte
-	Fs   *StaticalFS
+	Fs   *StatiqFS
 }
 
-type StaticalFS struct {
+type StatiqFS struct {
 	Files map[string]File
 	Dirs  map[string][]string
 }
@@ -50,7 +50,7 @@ func Register(data string) { ZipData = data }
 
 // New creates a new file system with the registered zip contents data.
 // It unzips all files and stores them in an in-memory map.
-func New() (*StaticalFS, error) {
+func New() (*StatiqFS, error) {
 	if ZipData == "" {
 		return nil, errors.New("statiq/fs: no zip data registered")
 	}
@@ -61,12 +61,11 @@ func New() (*StaticalFS, error) {
 
 	files := make(map[string]File, len(zipReader.File))
 	dirs := make(map[string][]string)
-	fs := &StaticalFS{Files: files, Dirs: dirs}
+	fs := &StatiqFS{Files: files, Dirs: dirs}
 	for _, zipFile := range zipReader.File {
 		fi := zipFile.FileInfo()
 		f := File{FileInfo: fi, Fs: fs}
-		f.Data, err = Unzip(zipFile)
-		if err != nil {
+		if f.Data, err = Unzip(zipFile); err != nil {
 			return nil, fmt.Errorf("statiq/fs: error unzipping file %q: %s", zipFile.Name, err)
 		}
 		files["/"+zipFile.Name] = f
@@ -74,17 +73,16 @@ func New() (*StaticalFS, error) {
 	for fn := range files {
 		// go up directories recursively in order to care deep directory
 		for dn := path.Dir(fn); dn != fn; {
-			if _, ok := files[dn]; !ok {
-				files[dn] = File{FileInfo: DirInfo{dn}, Fs: fs}
-			} else {
+			if _, ok := files[dn]; ok {
 				break
 			}
+
+			files[dn] = File{FileInfo: DirInfo{dn}, Fs: fs}
 			fn, dn = dn, path.Dir(dn)
 		}
 	}
 	for fn := range files {
-		dn := path.Dir(fn)
-		if fn != dn {
+		if dn := path.Dir(fn); fn != dn {
 			fs.Dirs[dn] = append(fs.Dirs[dn], path.Base(fn))
 		}
 	}
@@ -119,7 +117,7 @@ func Unzip(zf *zip.File) ([]byte, error) {
 // no file matching the given file name is found in the archive.
 // If a directory is requested, Open returns the file named "index.html"
 // in the requested directory, if that file exists.
-func (fs *StaticalFS) Open(name string) (http.File, error) {
+func (fs *StatiqFS) Open(name string) (http.File, error) {
 	name = strings.Replace(name, "//", "/", -1)
 	if f, ok := fs.Files[name]; ok {
 		return NewHTTPFile(f), nil

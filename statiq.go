@@ -30,21 +30,15 @@ import (
 	"time"
 )
 
-const (
-	nameSourceFile = "statiq.go"
-)
-
-var namePackage string
-
 var (
-	flagSrc        = flag.String("src", path.Join(".", "public"), "The path of the source directory.")
-	flagDest       = flag.String("dest", ".", "The destination path of the generated package.")
-	flagNoMtime    = flag.Bool("m", false, "Ignore modification times on files.")
-	flagNoCompress = flag.Bool("Z", false, "Do not use compression to shrink the files.")
-	flagForce      = flag.Bool("f", false, "Overwrite destination file if it already exists.")
-	flagTags       = flag.String("tags", "", "Write build constraint tags")
-	flagPkg        = flag.String("p", "statiq", "Name of the generated package")
-	flagPkgCmt     = flag.String("c", "Package statiq contains static assets.", "The package comment. An empty value disables this comment.\n")
+	flagSrc     = flag.String("src", path.Join(".", "public"), "The path of the source directory.")
+	flagDest    = flag.String("dest", ".", "The destination path of the generated package.")
+	flagNoMtime = flag.Bool("m", false, "Ignore modification times on files.")
+	flagNoZip   = flag.Bool("Z", false, "Do not use zip to shrink the files.")
+	flagForce   = flag.Bool("f", false, "Overwrite destination file if it already exists.")
+	flagTags    = flag.String("tags", "", "Write build constraint tags")
+	flagPkg     = flag.String("p", "statiq", "Name of the generated package")
+	flagPkgCmt  = flag.String("c", "Package statiq contains static assets.", "The package comment. An empty value disables this comment.\n")
 )
 
 // mtimeDate holds the arbitrary mtime that we assign to files when flagNoMtime is set.
@@ -53,21 +47,17 @@ var mtimeDate = time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC)
 func main() {
 	flag.Parse()
 
-	namePackage = *flagPkg
-
 	file, err := generateSource(*flagSrc)
 	if err != nil {
 		exitWithError(err)
 	}
 
-	destDir := path.Join(*flagDest, namePackage)
-	err = os.MkdirAll(destDir, 0755)
-	if err != nil {
+	destDir := path.Join(*flagDest, *flagPkg)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
 		exitWithError(err)
 	}
 
-	err = rename(file.Name(), path.Join(destDir, nameSourceFile))
-	if err != nil {
+	if err := rename(file.Name(), path.Join(destDir, "statiq.go")); err != nil {
 		exitWithError(err)
 	}
 }
@@ -79,6 +69,7 @@ func rename(src, dest string) error {
 	if err := os.Rename(src, dest); err == nil {
 		return nil
 	}
+
 	// If the rename failed (might do so due to temporary file residing on a
 	// different device), try to copy byte by byte.
 	rc, err := os.Open(src)
@@ -120,7 +111,7 @@ func rename(src, dest string) error {
 func generateSource(srcPath string) (file *os.File, err error) {
 	var buffer bytes.Buffer
 	var zipWriter io.Writer = &buffer
-	f, err := ioutil.TempFile("", namePackage)
+	f, err := ioutil.TempFile("", *flagPkg)
 	if err != nil {
 		return
 	}
@@ -159,7 +150,7 @@ func generateSource(srcPath string) (file *os.File, err error) {
 			fHeader.SetModTime(mtimeDate)
 		}
 		fHeader.Name = filepath.ToSlash(relPath)
-		if !*flagNoCompress {
+		if !*flagNoZip {
 			fHeader.Method = zip.Deflate
 		}
 		f, err := w.CreateHeader(fHeader)
@@ -196,7 +187,7 @@ import (
 )
 
 func init() {
-	data := "`, tags, comment, namePackage)
+	data := "`, tags, comment, *flagPkg)
 	FprintZipData(&qb, buffer.Bytes())
 	_, _ = fmt.Fprint(&qb, `"
 	fs.Register(data)
