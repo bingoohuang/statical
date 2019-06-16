@@ -34,6 +34,7 @@ var (
 	flagSrc     = flag.String("src", path.Join(".", "public"), "The path of the source directory.")
 	flagDest    = flag.String("dest", ".", "The destination path of the generated package.")
 	flagNoMtime = flag.Bool("m", false, "Ignore modification times on files.")
+	flagWatch   = flag.Bool("w", false, "Watching the src path and build when changed.")
 	flagNoZip   = flag.Bool("Z", false, "Do not use zip to shrink the files.")
 	flagForce   = flag.Bool("f", false, "Overwrite destination file if it already exists.")
 	flagTags    = flag.String("tags", "", "Write build constraint tags")
@@ -47,16 +48,22 @@ var mtimeDate = time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC)
 func main() {
 	flag.Parse()
 
+	statiq()
+
+	if *flagWatch {
+		watchSrc(*flagSrc)
+	}
+}
+
+func statiq() {
 	file, err := generateSource(*flagSrc)
 	if err != nil {
 		exitWithError(err)
 	}
-
 	destDir := path.Join(*flagDest, *flagPkg)
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		exitWithError(err)
 	}
-
 	if err := rename(file.Name(), path.Join(destDir, "statiq.go")); err != nil {
 		exitWithError(err)
 	}
@@ -136,7 +143,7 @@ func generateSource(srcPath string) (file *os.File, err error) {
 			return err
 		}
 		b, err := ioutil.ReadFile(path)
-		if err != nil {
+		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
 		fHeader, err := zip.FileInfoHeader(fi)
