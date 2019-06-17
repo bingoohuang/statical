@@ -1,7 +1,10 @@
 language: go
 
 go:
-  - 1.12.x
+  - master
+
+before_install:
+  - go get -t -v ./...
 
 install:
   - go build -v
@@ -9,3 +12,7 @@ install:
 
 script:
   - go test -v -bench=. ./...
+  - go test -race -coverprofile=coverage.txt -covermode=atomic
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

@@ -8,6 +8,26 @@ Is this a crazy idea? No, not necessarily. If you're building a tool that has a 
 
 ## Usage
 
+```bash
+➜  statiq git:(master) ✗ ./statiq -h
+Usage of ./statiq:
+  -Z	Do not use zip to shrink the files.
+  -c string
+    	The package comment. An empty value disables this comment.
+    	 (default "Package statiq contains static assets.")
+  -dest string
+    	The destination path of the generated package. (default ".")
+  -f	Overwrite destination file if it already exists.
+  -m	Ignore modification times on files.
+  -p string
+    	Name of the generated package (default "statiq")
+  -src string
+    	The path of the source directory. (default "public")
+  -tags string
+    	Write build constraint tags
+  -w	Watching the src path and build when changed.
+```
+
 Install the command line tool first.
 
 	go get github.com/bingoohuang/statiq
